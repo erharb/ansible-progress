@@ -7,10 +7,10 @@ __metaclass__ = type
 DOCUMENTATION = '''
     callback: progress_default
     type: stdout
-    short_description: progress based screen output with default Ansible log output
+    short_description: Single line progress based screen output with default Ansible log output
     version_added: historical
     description:
-        - This shows indeterminate progress dots as tasks continue work but logs default Ansible output to file
+        - This shows task progress on a single line but logs default Ansible output to file
     extends_documentation_fragment:
       - default_callback
     requirements:
@@ -62,7 +62,6 @@ class CallbackModule(CallbackBase):
         #-------------------------------------#
         # Begin custom progress display print #
         self._prev_carried_msg = None
-        self._progress = None
         
         # Adding these in for now since set_options was not working in Ansible 2.4.0
         self.display_skipped_hosts = C.DISPLAY_SKIPPED_HOSTS
@@ -99,7 +98,7 @@ class CallbackModule(CallbackBase):
         if self._last_task_banner != result._task._uuid:
             self._print_task_banner(result._task)
 
-        self._handle_exception(result._result, use_stderr=self.display_failed_stderr)
+        self._handle_exception(result._result)
         self._handle_warnings(result._result)
 
         if result._task.loop and 'results' in result._result:
@@ -206,18 +205,6 @@ class CallbackModule(CallbackBase):
         self._display.banner("NO MORE HOSTS LEFT")
 
     def v2_playbook_on_task_start(self, task, is_conditional):
-        #-------------------------------------#
-        # Begin custom progress display print #
-        # stop previous task progress thread and spawn a new task progress thread for this task
-        if self._progress is not None:
-            self._progress.keep_alive = False
-
-        if not isinstance(task, Block):
-            self._progress = ProgressThread(self._print_progress_dot)
-            self._progress.start()
-        # End custom progress display print #
-        #-----------------------------------#
-
         self._task_start(task, prefix='TASK')
 
     def _task_start(self, task, prefix=None):
@@ -278,11 +265,6 @@ class CallbackModule(CallbackBase):
     def v2_playbook_on_play_start(self, play):
         #-------------------------------------#
         # Begin custom progress display print #
-        if self._progress is not None:
-            # stop previous task progress thread since new play means new tasks
-            self._progress.keep_alive = False
-            self._progress = None
-
         if self._prev_carried_msg is not None:
             # print blank line so last carried messages are not overwritten
             self._clear_carried_msg()
@@ -484,18 +466,6 @@ class CallbackModule(CallbackBase):
 
 #-------------------------------------#
 # Begin custom progress display print #
-    def _print_progress_dot(self, dot='.', color=None):
-        self.progress_display(dot, color=color, end_line=False)
-
-    def _store_carried_msg(self, msg):
-        # could haved used a boolean, but just in case length of message is needed it will be here
-        if self._prev_carried_msg is None:
-            self._prev_carried_msg = ''
-        self._prev_carried_msg = self._prev_carried_msg + msg
-
-    def _clear_carried_msg(self):
-        self._prev_carried_msg = None
-
     def _get_item_label(self, result):
         ''' retrieves the value to be displayed as a label for an item entry from a result object
         (For backwards compatibility, introduced in Ansible 2.5)
@@ -505,6 +475,15 @@ class CallbackModule(CallbackBase):
         else:
             item = result.get('_ansible_item_label', result.get('item'))
         return item
+
+    def _store_carried_msg(self, msg):
+        # could haved used a boolean, but just in case length of message is needed it will be here
+        if self._prev_carried_msg is None:
+            self._prev_carried_msg = ''
+        self._prev_carried_msg = self._prev_carried_msg + msg
+
+    def _clear_carried_msg(self):
+        self._prev_carried_msg = None
 
     def progress_display(self, msg, color=None, stderr=False, end_line=True):
         """ Display a message to the user (modification of Ansible's ansible.utils.Display.display() to prevent automatic newline)
@@ -553,17 +532,3 @@ class CallbackModule(CallbackBase):
                 # when piping to "head -n1"
                 if e.errno != errno.EPIPE:
                     raise
-
-class ProgressThread(threading.Thread):
-    def __init__(self, function_to_call, sleep_time=1):
-        threading.Thread.__init__(self)
-        self.daemon = True
-        self.runnable = function_to_call
-        self.sleep_time = sleep_time
-
-        self.keep_alive = True
-
-    def run(self):
-        while self.keep_alive:
-            time.sleep(self.sleep_time)
-            self.runnable()
