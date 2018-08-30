@@ -63,6 +63,12 @@ class CallbackModule(CallbackBase):
         # Begin custom progress display print #
         self._prev_carried_msg = None
         self._progress = None
+        
+        # Adding these in for now since set_options was not working in Ansible 2.4.0
+        self.display_skipped_hosts = C.DISPLAY_SKIPPED_HOSTS
+        self.display_ok_hosts = True
+        self.show_custom_stats = C.SHOW_CUSTOM_STATS
+        self.display_failed_stderr = False
         # End custom progress display print #
         #-----------------------------------#
 
@@ -72,17 +78,18 @@ class CallbackModule(CallbackBase):
         self._task_type_cache = {}
         super(CallbackModule, self).__init__()
 
-    def set_options(self, task_keys=None, var_options=None, direct=None):
-
-        super(CallbackModule, self).set_options(task_keys=task_keys, var_options=var_options, direct=direct)
-
-        # for backwards compat with plugins subclassing default, fallback to constants
-        for option, constant in COMPAT_OPTIONS:
-            try:
-                value = self.get_option(option)
-            except (AttributeError, KeyError):
-                value = constant
-            setattr(self, option, value)
+    # Commenting out for now since not working in Ansible 2.4.0
+    # def set_options(self, task_keys=None, var_options=None, direct=None):
+    #
+    #     super(CallbackModule, self).set_options(task_keys=task_keys, var_options=var_options, direct=direct)
+    #
+    #     # for backwards compat with plugins subclassing default, fallback to constants
+    #     for option, constant in COMPAT_OPTIONS:
+    #         try:
+    #             value = self.get_option(option)
+    #         except (AttributeError, KeyError):
+    #             value = constant
+    #         setattr(self, option, value)
 
     def v2_runner_on_failed(self, result, ignore_errors=False):
 
@@ -148,16 +155,16 @@ class CallbackModule(CallbackBase):
             if (self._display.verbosity > 0 or '_ansible_verbose_always' in result._result) and '_ansible_verbose_override' not in result._result:
                 msg += " => %s" % (self._dump_results(result._result),)
             self._display.display(msg, color=color, log_only=True)
-            
+
         #-------------------------------------#
         # Begin custom progress display print #
         if result._result.get('changed', False):
             state = '~'
         else:
             state = '='
-            
+
         self.progress_display("%s[%s]" % (result._host.get_name(), state), color=color, end_line=False)
-        
+
 
     def v2_runner_on_skipped(self, result):
 
@@ -175,7 +182,7 @@ class CallbackModule(CallbackBase):
                 if (self._display.verbosity > 0 or '_ansible_verbose_always' in result._result) and '_ansible_verbose_override' not in result._result:
                     msg += " => %s" % self._dump_results(result._result)
                 self._display.display(msg, color=C.COLOR_SKIP, log_only=True)
-            
+
             #-------------------------------------#
             # Begin custom progress display print #
             self.progress_display("%s[>]" % (result._host.get_name()), color=C.COLOR_SKIP, end_line=False)
@@ -204,13 +211,13 @@ class CallbackModule(CallbackBase):
         # stop previous task progress thread and spawn a new task progress thread for this task
         if self._progress is not None:
             self._progress.keep_alive = False
-            
+
         if not isinstance(task, Block):
             self._progress = ProgressThread(self._print_progress_dot)
             self._progress.start()
         # End custom progress display print #
         #-----------------------------------#
-        
+
         self._task_start(task, prefix='TASK')
 
     def _task_start(self, task, prefix=None):
@@ -275,14 +282,14 @@ class CallbackModule(CallbackBase):
             # stop previous task progress thread since new play means new tasks
             self._progress.keep_alive = False
             self._progress = None
-            
+
         if self._prev_carried_msg is not None:
             # print blank line so last carried messages are not overwritten
             self._clear_carried_msg()
             self.progress_display('')
         # End custom progress display print #
         #-----------------------------------#
-        
+
         name = play.get_name().strip()
         if not name:
             msg = u"PLAY"
@@ -340,14 +347,14 @@ class CallbackModule(CallbackBase):
         if (self._display.verbosity > 0 or '_ansible_verbose_always' in result._result) and '_ansible_verbose_override' not in result._result:
             msg += " => %s" % self._dump_results(result._result)
         self._display.display(msg, color=color, log_only=True)
-        
+
         #-------------------------------------#
         # Begin custom progress display print #
         if result._result.get('changed', False):
             state = '~'
         else:
             state = '='
-            
+
         self.progress_display(state, color=color, end_line=False)
 
     def v2_runner_item_on_failed(self, result):
@@ -366,7 +373,7 @@ class CallbackModule(CallbackBase):
 
         self._handle_warnings(result._result)
         self._display.display(msg + " (item=%s) => %s" % (self._get_item_label(result._result), self._dump_results(result._result)), color=C.COLOR_ERROR, log_only=True)
-        
+
         #-------------------------------------#
         # Begin custom progress display print #
         self.progress_display('!', color=C.COLOR_ERROR, end_line=False)
@@ -381,7 +388,7 @@ class CallbackModule(CallbackBase):
             if (self._display.verbosity > 0 or '_ansible_verbose_always' in result._result) and '_ansible_verbose_override' not in result._result:
                 msg += " => %s" % self._dump_results(result._result)
             self._display.display(msg, color=C.COLOR_SKIP, log_only=True)
-            
+
             #-------------------------------------#
             # Begin custom progress display print #
             self.progress_display('>', color=C.COLOR_SKIP, end_line=False)
@@ -401,7 +408,7 @@ class CallbackModule(CallbackBase):
             self.progress_display('')
         # End custom progress display print #
         #-----------------------------------#
-        
+
         self._display.banner("PLAY RECAP")
 
         hosts = sorted(stats.processed.keys())
@@ -465,7 +472,7 @@ class CallbackModule(CallbackBase):
         if (self._display.verbosity > 2 or '_ansible_verbose_always' in result._result) and '_ansible_verbose_override' not in result._result:
             msg += "Result was: %s" % self._dump_results(result._result)
         self._display.display(msg, color=C.COLOR_DEBUG, log_only=True)
-        
+
         #-------------------------------------#
         # Begin custom progress display print #
         msg = "RETRY[%d/%d]" % (result._result['attempts'], result._result['retries'])
@@ -479,16 +486,16 @@ class CallbackModule(CallbackBase):
 # Begin custom progress display print #
     def _print_progress_dot(self, dot='.', color=None):
         self.progress_display(dot, color=color, end_line=False)
-        
+
     def _store_carried_msg(self, msg):
         # could haved used a boolean, but just in case length of message is needed it will be here
         if self._prev_carried_msg is None:
             self._prev_carried_msg = ''
         self._prev_carried_msg = self._prev_carried_msg + msg
-        
+
     def _clear_carried_msg(self):
         self._prev_carried_msg = None
-        
+
     def _get_item_label(self, result):
         ''' retrieves the value to be displayed as a label for an item entry from a result object
         (For backwards compatibility, introduced in Ansible 2.5)
@@ -498,7 +505,7 @@ class CallbackModule(CallbackBase):
         else:
             item = result.get('_ansible_item_label', result.get('item'))
         return item
-        
+
     def progress_display(self, msg, color=None, stderr=False, end_line=True):
         """ Display a message to the user (modification of Ansible's ansible.utils.Display.display() to prevent automatic newline)
         https://github.com/ansible/ansible/blob/devel/lib/ansible/utils/display.py
@@ -507,17 +514,17 @@ class CallbackModule(CallbackBase):
         nocolor = msg
         if color:
             msg = stringc(msg, color)
-        
+
         if msg is not None:
-            
+
             if end_line:
                 msg2 = msg + u'\n'
             else:
                 msg2 = msg + u' '
-                
+
             if not end_line:
                 self._store_carried_msg(nocolor)
-                
+
             elif self._prev_carried_msg is not None:
                 # print blank with newline to write to next line instead of carried line
                 self._clear_carried_msg()
