@@ -25,14 +25,14 @@ TASK [Gathering Facts] *********************************************************
 TASK [Get list of installed packages] ******************************************
 . . centos1[=] . centos3[=] centos2[=]
 
-PLAY [Setup postgres server] **********************************************
+PLAY [Setup postgres server] ***************************************************
 
 TASK [Gathering Facts] *********************************************************
 . . centos2[=]
 TASK [Install Postgres server] *************************************************
 . . . . . . . . . . . . . centos2[~]
 
-PLAY [Setup php web server] ***********************************************
+PLAY [Setup php web server] ****************************************************
 
 TASK [Gathering Facts] *********************************************************
 . . centos3[=]
@@ -64,4 +64,13 @@ callback_plugins = ./callback_plugins
 ```
 $ export PROGRESS_TIME=5
 $ ansible-playbook ...
+...
+TASK [set_fact] ****************************************************************
+ok: [deployTarget -> localhost]
+
+TASK [Get host details] ********************************************************
+. . . . . . . . . . . . . . ok: [deployTarget]
+
+TASK [Process host details] ****************************************************
+. . . ok: [deployTarget -> localhost]
 ```
